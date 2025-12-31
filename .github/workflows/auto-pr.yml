@@ -1,0 +1,42 @@
+name: Auto PR to main
+
+on:
+  push:
+    branches:
+      - "auto/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD: ${{ github.ref_name }}
+          BASE: main
+        run: |
+          set -euo pipefail
+
+          # 既存PRがあるかチェック（openのみ）
+          pr_count="$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/pulls?state=open&head=${REPO}:${HEAD}&base=${BASE}" \
+            --jq 'length')"
+
+          if [[ "${pr_count}" -gt 0 ]]; then
+            echo "PR already exists for ${HEAD} -> ${BASE}"
+            exit 0
+          fi
+
+          # PR作成（タイトル/本文は最低限。好みで規約に合わせて）
+          gh pr create \
+            --repo "${REPO}" \
+            --head "${HEAD}" \
+            --base "${BASE}" \
+            --title "Auto PR: ${HEAD} -> ${BASE}" \
+            --body "Created automatically on push."
